@@ -27,18 +27,10 @@ var App = {
     var self = this;
     self.cloudbase = Auth.initCloudBase();
 
-    // 检查是否已有登录态（用于页面刷新恢复会话）
-    Auth.getLoginState().then(function (loginState) {
-      if (loginState) {
-        Auth.checkAdmin(loginState.user.uid).then(function (isAdmin) {
-          if (isAdmin) {
-            self.state.currentUser = { uid: loginState.user.uid };
-            self.state.isAdmin = true;
-            self.showApp();
-          }
-        });
-      }
-    });
+    // 检查是否已有登录态（匿名登录持久化，刷新后自动恢复）
+    Auth.loginAnonymously().then(function () {
+      // 匿名登录成功但未验证密码 → 保持登录页
+    }).catch(function () {});
 
     // 登录按钮
     var loginBtn = document.getElementById('login-btn');
@@ -64,19 +56,27 @@ var App = {
     var self = this;
     var btn = document.getElementById('login-btn');
     var errEl = document.getElementById('login-error');
+    var password = document.getElementById('login-password').value;
+
+    if (!password) {
+      errEl.textContent = '请输入管理密码';
+      errEl.style.display = 'block';
+      return;
+    }
+
     btn.disabled = true;
-    btn.textContent = '登录中...';
+    btn.textContent = '验证中...';
     errEl.style.display = 'none';
 
-    Auth.login().then(function (result) {
-      self.state.currentUser = { uid: result.openid };
+    Auth.login(password).then(function (result) {
+      self.state.currentUser = { uid: 'admin' };
       self.state.isAdmin = true;
       self.showApp();
     }).catch(function (e) {
       btn.disabled = false;
-      btn.textContent = '微信扫码登录';
-      if (e.message === 'not_admin') {
-        errEl.textContent = '您不是管理员，无法访问后台';
+      btn.textContent = '登 录';
+      if (e.message === 'wrong_password') {
+        errEl.textContent = '密码错误';
       } else {
         errEl.textContent = '登录失败，请重试';
       }
