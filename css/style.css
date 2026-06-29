@@ -56,6 +56,18 @@ body {
   font-size: 13px;
 }
 
+.login-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  outline: none;
+  text-align: center;
+}
+.login-input:focus { border-color: #6366f1; }
+
 /* --- App Shell Layout --- */
 #app-shell {
   display: flex;
