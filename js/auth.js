@@ -40,18 +40,28 @@ var Auth = {
   login: function () {
     var self = this;
     var auth = App.cloudbase.auth({ persistence: 'local' });
-    return auth.toDefaultLoginPage()
-      .then(function (loginState) {
-        var openid = loginState.user.uid;
-        return self.checkAdmin(openid).then(function (isAdmin) {
-          if (isAdmin) {
-            return { openid: openid, isAdmin: true };
-          } else {
-            auth.signOut();
-            throw new Error('not_admin');
+
+    // CloudBase Web SDK 扫码登录：跳转到云开发内置登录页
+    try {
+      return auth.toDefaultLoginPage({ redirectUrl: window.location.href })
+        .then(function (loginState) {
+          if (!loginState || !loginState.user) {
+            throw new Error('login_failed');
           }
+          var openid = loginState.user.uid;
+          return self.checkAdmin(openid).then(function (isAdmin) {
+            if (isAdmin) {
+              return { openid: openid, isAdmin: true };
+            } else {
+              auth.signOut();
+              throw new Error('not_admin');
+            }
+          });
         });
-      });
+    } catch (e) {
+      // 如果 toDefaultLoginPage 不可用，直接跳转云开发登录页
+      return auth.signInWithRedirect({ loginType: 'WECHAT' });
+    }
   },
 
   /**
