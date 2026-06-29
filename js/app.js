@@ -25,17 +25,20 @@ var App = {
    */
   init: function () {
     var self = this;
+    console.log('[App] 初始化 CloudBase...');
     self.cloudbase = Auth.initCloudBase();
+    console.log('[App] CloudBase 实例:', self.cloudbase ? 'OK' : 'FAILED');
 
-    // 登录按钮
     var loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
       loginBtn.addEventListener('click', function () {
         self.handleLogin();
       });
+      console.log('[App] 登录按钮已绑定');
+    } else {
+      console.error('[App] 未找到登录按钮');
     }
 
-    // 退出按钮
     var logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', function () {
@@ -44,14 +47,17 @@ var App = {
     }
   },
 
-  /**
-   * 处理登录
-   */
   handleLogin: function () {
     var self = this;
     var btn = document.getElementById('login-btn');
     var errEl = document.getElementById('login-error');
-    var password = document.getElementById('login-password').value;
+    var pwdInput = document.getElementById('login-password');
+
+    if (!pwdInput) {
+      console.error('[App] 未找到密码输入框');
+      return;
+    }
+    var password = pwdInput.value;
 
     if (!password) {
       errEl.textContent = '请输入管理密码';
@@ -59,22 +65,21 @@ var App = {
       return;
     }
 
+    console.log('[App] 开始登录验证...');
     btn.disabled = true;
     btn.textContent = '验证中...';
     errEl.style.display = 'none';
 
     Auth.login(password).then(function (result) {
+      console.log('[App] 登录成功');
       self.state.currentUser = { uid: 'admin' };
       self.state.isAdmin = true;
       self.showApp();
     }).catch(function (e) {
+      console.error('[App] 登录失败:', e.message || e);
       btn.disabled = false;
       btn.textContent = '登 录';
-      if (e.message === 'wrong_password') {
-        errEl.textContent = '密码错误';
-      } else {
-        errEl.textContent = '登录失败，请重试';
-      }
+      errEl.textContent = e.message || '登录失败，请重试';
       errEl.style.display = 'block';
     });
   },
