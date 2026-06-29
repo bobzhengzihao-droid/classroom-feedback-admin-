@@ -25,18 +25,23 @@ var App = {
    */
   init: function () {
     var self = this;
-    console.log('[App] 初始化 CloudBase...');
+
+    // SDK 加载检查
+    if (!window.cloudbase) {
+      var btn = document.getElementById('login-btn');
+      if (btn) { btn.textContent = 'SDK 加载失败，请刷新'; btn.disabled = true; }
+      var errEl = document.getElementById('login-error');
+      if (errEl) { errEl.textContent = 'CDN 加载超时，请检查网络后刷新页面'; errEl.style.display = 'block'; }
+      return;
+    }
+
     self.cloudbase = Auth.initCloudBase();
-    console.log('[App] CloudBase 实例:', self.cloudbase ? 'OK' : 'FAILED');
 
     var loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
       loginBtn.addEventListener('click', function () {
         self.handleLogin();
       });
-      console.log('[App] 登录按钮已绑定');
-    } else {
-      console.error('[App] 未找到登录按钮');
     }
 
     var logoutBtn = document.getElementById('logout-btn');
