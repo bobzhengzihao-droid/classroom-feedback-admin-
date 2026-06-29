@@ -27,11 +27,6 @@ var App = {
     var self = this;
     self.cloudbase = Auth.initCloudBase();
 
-    // 检查是否已有登录态（匿名登录持久化，刷新后自动恢复）
-    Auth.loginAnonymously().then(function () {
-      // 匿名登录成功但未验证密码 → 保持登录页
-    }).catch(function () {});
-
     // 登录按钮
     var loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
@@ -88,19 +83,7 @@ var App = {
    * 处理登出
    */
   handleLogout: function () {
-    var self = this;
-    Auth.logout().then(function () {
-      self.state.currentUser = null;
-      self.state.isAdmin = false;
-      self.moduleRefs = {};
-      document.getElementById('app-shell').style.display = 'none';
-      document.getElementById('login-overlay').style.display = 'flex';
-      var loginBtn = document.getElementById('login-btn');
-      if (loginBtn) {
-        loginBtn.disabled = false;
-        loginBtn.textContent = '微信扫码登录';
-      }
-    });
+    Auth.logout();
   },
 
   /**
