@@ -4,8 +4,8 @@ var Auth = {
   ADMIN_COLLECTION: 'admins',
 
   initCloudBase: function () {
-    var tcb = window.cloudbase;
-    var app = tcb.init({
+    var cloudbase = window.cloudbase;
+    var app = cloudbase.init({
       env: 'cloudbase-d3gqm8sr8db1d7582'
     });
     return app;
@@ -28,12 +28,13 @@ var Auth = {
     var self = this;
     var auth = App.cloudbase.auth({ persistence: 'local' });
 
-    // 先检查是否已经登录
+    // 先检查是否已登录（例如从登录页回调回来）
     return auth.getLoginState().then(function (state) {
       if (state && state.user) {
-        return self.checkAdmin(state.user.uid).then(function (isAdmin) {
+        var openid = state.user.uid;
+        return self.checkAdmin(openid).then(function (isAdmin) {
           if (isAdmin) {
-            return { openid: state.user.uid, isAdmin: true };
+            return { openid: openid, isAdmin: true };
           } else {
             auth.signOut();
             throw new Error('not_admin');
@@ -41,13 +42,24 @@ var Auth = {
         });
       }
 
-      // 未登录：跳转到云开发 Web 登录页
-      var callbackUrl = window.location.href;
-      var loginUrl = 'https://cloudbase-d3gqm8sr8db1d7582.service.tcloudbase.com/login?callback_url=' + encodeURIComponent(callbackUrl);
-      window.location.href = loginUrl;
-
-      // 返回 pending promise（页面即将跳转）
-      return new Promise(function () {});
+      // 未登录：使用 SDK 内置登录页跳转
+      return auth.toDefaultLoginPage().then(function (loginState) {
+        if (!loginState || !loginState.user) {
+          throw new Error('login_failed');
+        }
+        var openid = loginState.user.uid;
+        return self.checkAdmin(openid).then(function (isAdmin) {
+          if (isAdmin) {
+            return { openid: openid, isAdmin: true };
+          } else {
+            auth.signOut();
+            throw new Error('not_admin');
+          }
+        });
+      });
+    }).catch(function (err) {
+      console.error('[Auth] login error:', err);
+      throw err;
     });
   },
 
