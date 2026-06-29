@@ -1,5 +1,5 @@
 // js/auth.js
-// 认证模块 — 匿名登录 + 管理密码验证
+// 认证模块 — 直接查 admins 集合校验密码（无登录态）
 var Auth = {
   ADMIN_COLLECTION: 'admins',
 
@@ -10,45 +10,21 @@ var Auth = {
     });
   },
 
-  // 匿名登录（无需微信扫码）
-  loginAnonymously: function () {
-    var auth = App.cloudbase.auth({ persistence: 'local' });
-    return auth.getLoginState().then(function (state) {
-      if (state && state.user) {
-        return state;
-      }
-      return auth.anonymousAuthProvider().signIn();
-    });
-  },
-
-  // 校验管理密码
-  checkPassword: function (password) {
+  login: function (password) {
     var db = App.cloudbase.database();
     return db.collection(this.ADMIN_COLLECTION)
       .where({ password: password })
       .get()
       .then(function (res) {
-        return res.data && res.data.length > 0;
-      })
-      .catch(function () {
-        return false;
-      });
-  },
-
-  login: function (password) {
-    var self = this;
-    return self.loginAnonymously().then(function () {
-      return self.checkPassword(password).then(function (valid) {
-        if (!valid) {
-          throw new Error('wrong_password');
+        if (res.data && res.data.length > 0) {
+          return { isAdmin: true };
         }
-        return { isAdmin: true };
+        throw new Error('wrong_password');
       });
-    });
   },
 
   logout: function () {
-    var auth = App.cloudbase.auth({ persistence: 'local' });
-    return auth.signOut();
+    // 清除本地 session，刷新页面回到登录页
+    window.location.reload();
   }
 };
