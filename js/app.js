@@ -1,35 +1,12 @@
 // js/app.js
 var App = {
-  cloudbase: null,
   state: {
     currentUser: null,
     isAdmin: false,
-    currentTab: 'overview'
+    currentTab: 'overview',
+    password: ''
   },
   moduleRefs: {},
-
-  db: function (collection, query, limit) {
-    var db = App.cloudbase.database();
-    var q = db.collection(collection);
-    var limitVal = limit || 100;
-    if (query && query.key) {
-      q = q.where({ key: query.key });
-    } else if (query && query.keyPrefix) {
-      q = q.where({ key: db.RegExp({ regexp: query.keyPrefix }) });
-    }
-    return q.limit(limitVal).get();
-  },
-  count: function (collection, query) {
-    var db = App.cloudbase.database();
-    var q = db.collection(collection);
-    if (query && query.keyPrefix) {
-      q = q.where({ key: db.RegExp({ regexp: query.keyPrefix }) });
-    }
-    return q.count();
-  },
-  callFunction: function (name, data) {
-    return App.cloudbase.callFunction({ name: name, data: data });
-  },
 
   NAV_ITEMS: [
     { id: 'overview',  label: '概览',     icon: '◆', module: 'modules/overview.js' },
@@ -43,23 +20,10 @@ var App = {
 
   init: function () {
     var self = this;
-
-    if (!window.cloudbase) {
-      document.getElementById('login-error').textContent = 'SDK 加载失败，请刷新';
-      document.getElementById('login-error').style.display = 'block';
-      return;
-    }
-
-    self.cloudbase = Auth.initCloudBase();
-
     var loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-      loginBtn.addEventListener('click', function () { self.handleLogin(); });
-    }
+    if (loginBtn) loginBtn.addEventListener('click', function () { self.handleLogin(); });
     var logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', function () { self.handleLogout(); });
-    }
+    if (logoutBtn) logoutBtn.addEventListener('click', function () { self.handleLogout(); });
   },
 
   handleLogin: function () {
@@ -69,30 +33,32 @@ var App = {
     var pwdInput = document.getElementById('login-password');
     var password = pwdInput ? pwdInput.value : '';
 
-    if (!password) {
-      errEl.textContent = '请输入管理密码';
-      errEl.style.display = 'block';
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = '验证中...';
-    errEl.style.display = 'none';
+    if (!password) { errEl.textContent = '请输入管理密码'; errEl.style.display = 'block'; return; }
+    btn.disabled = true; btn.textContent = '验证中...'; errEl.style.display = 'none';
 
     Auth.login(password).then(function (result) {
       self.state.currentUser = { uid: 'admin' };
       self.state.isAdmin = true;
+      self.state.password = result.password;
       self.showApp();
     }).catch(function (e) {
-      btn.disabled = false;
-      btn.textContent = '登 录';
+      btn.disabled = false; btn.textContent = '登 录';
       errEl.textContent = e.message || '登录失败';
       errEl.style.display = 'block';
     });
   },
 
-  handleLogout: function () {
-    Auth.logout();
+  handleLogout: function () { Auth.logout(); },
+
+  // 模块可用的数据接口
+  db: function (collection, query, limit) {
+    return Auth.dbQuery(App.state.password, collection, query, limit);
+  },
+  count: function (collection, query) {
+    return Auth.dbCount(App.state.password, collection, query);
+  },
+  callFunction: function (name, data) {
+    return Auth.callFunction(App.state.password, name, data);
   },
 
   showApp: function () {
@@ -117,40 +83,20 @@ var App = {
   navigate: function (tabId) {
     var self = this;
     self.state.currentTab = tabId;
-
     var items = document.querySelectorAll('#nav-list li');
-    items.forEach(function (li, i) {
-      li.classList.toggle('active', self.NAV_ITEMS[i] && self.NAV_ITEMS[i].id === tabId);
-    });
-
+    items.forEach(function (li, i) { li.classList.toggle('active', self.NAV_ITEMS[i] && self.NAV_ITEMS[i].id === tabId); });
     var navItem = self.NAV_ITEMS.find(function (n) { return n.id === tabId; });
     if (!navItem) return;
-
     var content = document.getElementById('content');
     content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-
-    if (self.moduleRefs[tabId]) {
-      self.moduleRefs[tabId].render(self.state);
-      return;
-    }
-
+    if (self.moduleRefs[tabId]) { self.moduleRefs[tabId].render(self.state); return; }
     var script = document.createElement('script');
     script.src = 'js/' + navItem.module;
-    script.onload = function () {
-      self.moduleRefs[tabId] = Module;
-      if (Module && typeof Module.render === 'function') {
-        Module.render(self.state);
-      }
-    };
-    script.onerror = function () {
-      content.innerHTML = '<div class="empty-state"><p>模块加载失败</p></div>';
-    };
+    script.onload = function () { self.moduleRefs[tabId] = Module; if (Module && Module.render) Module.render(self.state); };
+    script.onerror = function () { content.innerHTML = '<div class="empty-state"><p>模块加载失败</p></div>'; };
     document.head.appendChild(script);
   }
 };
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function () { App.init(); });
-} else {
-  App.init();
-}
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', function () { App.init(); }); }
+else { App.init(); }
