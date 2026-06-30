@@ -1,42 +1,30 @@
 // js/auth.js
+// 通过 HTTP 调用云函数，无需任何 SDK 或登录
 var Auth = {
-  ADMIN_COLLECTION: 'admins',
+  // 云函数 HTTP 地址 — 部署后由用户更新
+  API_URL: 'https://REPLACE_AFTER_DEPLOY.apigw.tcloudbase.com/admin-api',
 
-  initCloudBase: function () {
-    var cloudbase = window.cloudbase;
-    return cloudbase.init({
-      env: 'cloudbase-d3gqm8sr8db1d7582'
+  call: function (data) {
+    return fetch(this.API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(function (r) {
+      if (!r.ok) throw new Error('网络错误 ' + r.status);
+      return r.json();
     });
   },
 
   login: function (password) {
-    var self = this;
-    var auth = App.cloudbase.auth({ persistence: 'local' });
-
-    // 先尝试匿名登录
-    return auth.anonymousAuthProvider().signIn().then(function () {
-      // 匿名登录成功，查库验证密码
-      var db = App.cloudbase.database();
-      return db.collection(self.ADMIN_COLLECTION)
-        .where({ password: password })
-        .get()
-        .then(function (res) {
-          if (res.data && res.data.length > 0) {
-            return { isAdmin: true };
-          }
-          throw new Error('密码错误');
-        });
-    }).catch(function (e) {
-      if (e.message === '密码错误') throw e;
-      console.error('[Auth] 匿名登录失败:', e.message || e);
-      throw new Error('匿名登录未开启，请先在云开发控制台 → 登录授权 → 开启匿名登录');
+    return this.call({ action: 'login', password: password }).then(function (res) {
+      if (res.ok) {
+        return { isAdmin: true, password: password };
+      }
+      throw new Error('密码错误');
     });
   },
 
   logout: function () {
-    var auth = App.cloudbase.auth({ persistence: 'local' });
-    return auth.signOut().then(function () {
-      window.location.reload();
-    });
+    window.location.reload();
   }
 };
