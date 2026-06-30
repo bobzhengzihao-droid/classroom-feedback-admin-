@@ -1,30 +1,44 @@
 // js/auth.js
-// 通过 HTTP 调用云函数，无需任何 SDK 或登录
 var Auth = {
-  // 云函数 HTTP 地址 — 部署后由用户更新
-  API_URL: 'https://REPLACE_AFTER_DEPLOY.apigw.tcloudbase.com/admin-api',
+  ADMIN_COLLECTION: 'admins',
 
-  call: function (data) {
-    return fetch(this.API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(function (r) {
-      if (!r.ok) throw new Error('网络错误 ' + r.status);
-      return r.json();
+  initCloudBase: function () {
+    return window.cloudbase.init({
+      env: 'cloudbase-d3gqm8sr8db1d7582'
     });
   },
 
-  login: function (password) {
-    return this.call({ action: 'login', password: password }).then(function (res) {
-      if (res.ok) {
-        return { isAdmin: true, password: password };
+  login: function () {
+    var self = this;
+    var auth = App.cloudbase.auth({ persistence: 'local' });
+
+    // 先检查是否已登录（扫码回调后刷新页面）
+    return auth.getLoginState().then(function (state) {
+      if (state && state.user) {
+        return self.checkAdmin(state.user.uid).then(function (isAdmin) {
+          if (isAdmin) return { isAdmin: true };
+          auth.signOut();
+          throw new Error('您不是管理员');
+        });
       }
-      throw new Error('密码错误');
+      // 未登录 → 跳转到云开发内置登录页（微信扫码）
+      return auth.toDefaultLoginPage();
     });
+  },
+
+  checkAdmin: function (openid) {
+    var db = App.cloudbase.database();
+    return db.collection(this.ADMIN_COLLECTION)
+      .where({ openid: openid })
+      .get()
+      .then(function (res) {
+        return res.data && res.data.length > 0;
+      })
+      .catch(function () { return false; });
   },
 
   logout: function () {
-    window.location.reload();
+    var auth = App.cloudbase.auth({ persistence: 'local' });
+    auth.signOut().then(function () { window.location.reload(); });
   }
 };
