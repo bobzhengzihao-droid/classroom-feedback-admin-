@@ -4,10 +4,6 @@ var Auth = {
 
   initCloudBase: function () {
     var cloudbase = window.cloudbase;
-    if (!cloudbase) {
-      console.error('[Auth] CloudBase SDK 未加载');
-      return null;
-    }
     return cloudbase.init({
       env: 'cloudbase-d3gqm8sr8db1d7582'
     });
@@ -15,26 +11,32 @@ var Auth = {
 
   login: function (password) {
     var self = this;
-    var tcb = App.cloudbase;
-    if (!tcb) {
-      return Promise.reject(new Error('SDK 未初始化'));
-    }
-    var db = tcb.database();
-    if (!db) {
-      return Promise.reject(new Error('数据库不可用'));
-    }
-    return db.collection(this.ADMIN_COLLECTION)
-      .where({ password: password })
-      .get()
-      .then(function (res) {
-        if (res.data && res.data.length > 0) {
-          return { isAdmin: true };
-        }
-        throw new Error('wrong_password');
-      });
+    var auth = App.cloudbase.auth({ persistence: 'local' });
+
+    // 先尝试匿名登录
+    return auth.anonymousAuthProvider().signIn().then(function () {
+      // 匿名登录成功，查库验证密码
+      var db = App.cloudbase.database();
+      return db.collection(self.ADMIN_COLLECTION)
+        .where({ password: password })
+        .get()
+        .then(function (res) {
+          if (res.data && res.data.length > 0) {
+            return { isAdmin: true };
+          }
+          throw new Error('密码错误');
+        });
+    }).catch(function (e) {
+      if (e.message === '密码错误') throw e;
+      console.error('[Auth] 匿名登录失败:', e.message || e);
+      throw new Error('匿名登录未开启，请先在云开发控制台 → 登录授权 → 开启匿名登录');
+    });
   },
 
   logout: function () {
-    window.location.reload();
+    var auth = App.cloudbase.auth({ persistence: 'local' });
+    return auth.signOut().then(function () {
+      window.location.reload();
+    });
   }
 };
