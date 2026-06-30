@@ -8,6 +8,29 @@ var App = {
   },
   moduleRefs: {},
 
+  db: function (collection, query, limit) {
+    var db = App.cloudbase.database();
+    var q = db.collection(collection);
+    var limitVal = limit || 100;
+    if (query && query.key) {
+      q = q.where({ key: query.key });
+    } else if (query && query.keyPrefix) {
+      q = q.where({ key: db.RegExp({ regexp: query.keyPrefix }) });
+    }
+    return q.limit(limitVal).get();
+  },
+  count: function (collection, query) {
+    var db = App.cloudbase.database();
+    var q = db.collection(collection);
+    if (query && query.keyPrefix) {
+      q = q.where({ key: db.RegExp({ regexp: query.keyPrefix }) });
+    }
+    return q.count();
+  },
+  callFunction: function (name, data) {
+    return App.cloudbase.callFunction({ name: name, data: data });
+  },
+
   NAV_ITEMS: [
     { id: 'overview',  label: '概览',     icon: '◆', module: 'modules/overview.js' },
     { id: 'teachers',  label: '教师管理', icon: '☰', module: 'modules/teachers.js' },
