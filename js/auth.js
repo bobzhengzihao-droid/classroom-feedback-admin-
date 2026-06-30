@@ -1,34 +1,31 @@
 // js/auth.js
 var Auth = {
-  ADMIN_COLLECTION: 'admins',
+  API_URL: 'https://cloudbase-d3gqm8sr8db1d7582-1438325887.ap-shanghai.app.tcloudbase.com/admin-api',
 
-  initCloudBase: function () {
-    return window.cloudbase.init({
-      env: 'cloudbase-d3gqm8sr8db1d7582'
-    });
+  call: function (data) {
+    return fetch(this.API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(function (r) { return r.json(); });
   },
 
   login: function (password) {
-    var self = this;
-    var auth = App.cloudbase.auth({ persistence: 'local' });
-
-    return auth.anonymousAuthProvider().signIn().then(function () {
-      var db = App.cloudbase.database();
-      return db.collection(self.ADMIN_COLLECTION)
-        .where({ password: password })
-        .get()
-        .then(function (res) {
-          if (res.data && res.data.length > 0) return { isAdmin: true };
-          throw new Error('密码错误');
-        });
-    }).catch(function (e) {
-      if (e.message === '密码错误') throw e;
-      throw new Error('匿名登录失败，需在云开发控制台开启匿名登录');
+    return this.call({ action: 'login', password: password }).then(function (res) {
+      if (res.ok) return { isAdmin: true, password: password };
+      throw new Error('密码错误');
     });
   },
 
-  logout: function () {
-    var auth = App.cloudbase.auth({ persistence: 'local' });
-    auth.signOut().then(function () { window.location.reload(); });
-  }
+  dbQuery: function (password, collection, query, limit) {
+    return this.call({ action: 'query', password: password, collection: collection, query: query || {}, limit: limit || 100 });
+  },
+  dbCount: function (password, collection, query) {
+    return this.call({ action: 'count', password: password, collection: collection, query: query || {} });
+  },
+  callFunction: function (password, funcName, funcData) {
+    return this.call({ action: 'callFunction', password: password, funcName: funcName, funcData: funcData });
+  },
+
+  logout: function () { window.location.reload(); }
 };
