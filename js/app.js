@@ -1,10 +1,10 @@
 // js/app.js
 var App = {
+  cloudbase: null,
   state: {
     currentUser: null,
     isAdmin: false,
-    currentTab: 'overview',
-    password: ''
+    currentTab: 'overview'
   },
   moduleRefs: {},
 
@@ -20,6 +20,29 @@ var App = {
 
   init: function () {
     var self = this;
+
+    if (!window.cloudbase) {
+      document.getElementById('login-error').textContent = 'SDK 加载失败，请刷新';
+      document.getElementById('login-error').style.display = 'block';
+      return;
+    }
+
+    self.cloudbase = Auth.initCloudBase();
+
+    // 检查是否已登录（扫码回调后）
+    var auth = self.cloudbase.auth({ persistence: 'local' });
+    auth.getLoginState().then(function (state) {
+      if (state && state.user) {
+        Auth.checkAdmin(state.user.uid).then(function (isAdmin) {
+          if (isAdmin) {
+            self.state.currentUser = { uid: state.user.uid };
+            self.state.isAdmin = true;
+            self.showApp();
+          }
+        });
+      }
+    });
+
     var loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
       loginBtn.addEventListener('click', function () { self.handleLogin(); });
@@ -34,27 +57,17 @@ var App = {
     var self = this;
     var btn = document.getElementById('login-btn');
     var errEl = document.getElementById('login-error');
-    var pwdInput = document.getElementById('login-password');
-    var password = pwdInput.value;
-
-    if (!password) {
-      errEl.textContent = '请输入管理密码';
-      errEl.style.display = 'block';
-      return;
-    }
-
     btn.disabled = true;
-    btn.textContent = '验证中...';
+    btn.textContent = '跳转中...';
     errEl.style.display = 'none';
 
-    Auth.login(password).then(function (result) {
-      self.state.currentUser = { uid: 'admin' };
+    Auth.login().then(function (result) {
+      self.state.currentUser = { uid: result.openid || 'admin' };
       self.state.isAdmin = true;
-      self.state.password = result.password;
       self.showApp();
     }).catch(function (e) {
       btn.disabled = false;
-      btn.textContent = '登 录';
+      btn.textContent = '微信扫码登录';
       errEl.textContent = e.message || '登录失败';
       errEl.style.display = 'block';
     });
@@ -81,17 +94,6 @@ var App = {
       li.addEventListener('click', function () { self.navigate(item.id); });
       navList.appendChild(li);
     });
-  },
-
-  // 提供给模块的数据库查询接口
-  db: function (collection, query, limit) {
-    return Auth.call({ action: 'query', collection: collection, query: query || {}, limit: limit || 100 });
-  },
-  count: function (collection, query) {
-    return Auth.call({ action: 'count', collection: collection, query: query || {} });
-  },
-  callFunction: function (name, data) {
-    return Auth.call({ action: 'callFunction', funcName: name, funcData: data });
   },
 
   navigate: function (tabId) {
