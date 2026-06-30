@@ -88,11 +88,17 @@ var App = {
     var navItem = self.NAV_ITEMS.find(function (n) { return n.id === tabId; });
     if (!navItem) return;
     var content = document.getElementById('content');
+    if (self.moduleRefs[tabId]) {
+      self.moduleRefs[tabId].render(self.state);
+      return;
+    }
     content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-    if (self.moduleRefs[tabId]) { self.moduleRefs[tabId].render(self.state); return; }
     var script = document.createElement('script');
     script.src = 'js/' + navItem.module;
-    script.onload = function () { self.moduleRefs[tabId] = Module; if (Module && Module.render) Module.render(self.state); };
+    script.onload = function () {
+      self.moduleRefs[tabId] = Module;
+      if (Module && Module.render) Module.render(self.state);
+    };
     script.onerror = function () { content.innerHTML = '<div class="empty-state"><p>模块加载失败</p></div>'; };
     document.head.appendChild(script);
   }
