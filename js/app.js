@@ -1,15 +1,13 @@
 // js/app.js
-// 应用外壳 — CloudBase 初始化、认证、导航、模块动态加载
 var App = {
-  cloudbase: null,
   state: {
     currentUser: null,
     isAdmin: false,
-    currentTab: 'overview'
+    currentTab: 'overview',
+    password: ''
   },
   moduleRefs: {},
 
-  // 导航配置：id, label, icon, module script 路径
   NAV_ITEMS: [
     { id: 'overview',  label: '概览',     icon: '◆', module: 'modules/overview.js' },
     { id: 'teachers',  label: '教师管理', icon: '☰', module: 'modules/teachers.js' },
@@ -20,35 +18,15 @@ var App = {
     { id: 'settings',  label: '操作日志', icon: '☷', module: 'modules/settings.js' }
   ],
 
-  /**
-   * 初始化应用
-   */
   init: function () {
     var self = this;
-
-    // SDK 加载检查
-    if (!window.cloudbase) {
-      var btn = document.getElementById('login-btn');
-      if (btn) { btn.textContent = 'SDK 加载失败，请刷新'; btn.disabled = true; }
-      var errEl = document.getElementById('login-error');
-      if (errEl) { errEl.textContent = 'CDN 加载超时，请检查网络后刷新页面'; errEl.style.display = 'block'; }
-      return;
-    }
-
-    self.cloudbase = Auth.initCloudBase();
-
     var loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
-      loginBtn.addEventListener('click', function () {
-        self.handleLogin();
-      });
+      loginBtn.addEventListener('click', function () { self.handleLogin(); });
     }
-
     var logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
-      logoutBtn.addEventListener('click', function () {
-        self.handleLogout();
-      });
+      logoutBtn.addEventListener('click', function () { self.handleLogout(); });
     }
   },
 
@@ -57,11 +35,6 @@ var App = {
     var btn = document.getElementById('login-btn');
     var errEl = document.getElementById('login-error');
     var pwdInput = document.getElementById('login-password');
-
-    if (!pwdInput) {
-      console.error('[App] 未找到密码输入框');
-      return;
-    }
     var password = pwdInput.value;
 
     if (!password) {
@@ -70,35 +43,27 @@ var App = {
       return;
     }
 
-    console.log('[App] 开始登录验证...');
     btn.disabled = true;
     btn.textContent = '验证中...';
     errEl.style.display = 'none';
 
     Auth.login(password).then(function (result) {
-      console.log('[App] 登录成功');
       self.state.currentUser = { uid: 'admin' };
       self.state.isAdmin = true;
+      self.state.password = result.password;
       self.showApp();
     }).catch(function (e) {
-      console.error('[App] 登录失败:', e.message || e);
       btn.disabled = false;
       btn.textContent = '登 录';
-      errEl.textContent = e.message || '登录失败，请重试';
+      errEl.textContent = e.message || '登录失败';
       errEl.style.display = 'block';
     });
   },
 
-  /**
-   * 处理登出
-   */
   handleLogout: function () {
     Auth.logout();
   },
 
-  /**
-   * 显示应用外壳，构建导航，进入概览页
-   */
   showApp: function () {
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('app-shell').style.display = 'flex';
@@ -106,9 +71,6 @@ var App = {
     this.navigate('overview');
   },
 
-  /**
-   * 根据 NAV_ITEMS 动态构建侧边导航
-   */
   buildNav: function () {
     var self = this;
     var navList = document.getElementById('nav-list');
@@ -116,22 +78,26 @@ var App = {
     self.NAV_ITEMS.forEach(function (item) {
       var li = document.createElement('li');
       li.innerHTML = '<span class="nav-icon">' + item.icon + '</span>' + item.label;
-      li.addEventListener('click', function () {
-        self.navigate(item.id);
-      });
+      li.addEventListener('click', function () { self.navigate(item.id); });
       navList.appendChild(li);
     });
   },
 
-  /**
-   * 切换到指定标签页，按需动态加载模块脚本
-   * @param {string} tabId — 对应 NAV_ITEMS 中的 id
-   */
+  // 提供给模块的数据库查询接口
+  db: function (collection, query, limit) {
+    return Auth.call({ action: 'query', collection: collection, query: query || {}, limit: limit || 100 });
+  },
+  count: function (collection, query) {
+    return Auth.call({ action: 'count', collection: collection, query: query || {} });
+  },
+  callFunction: function (name, data) {
+    return Auth.call({ action: 'callFunction', funcName: name, funcData: data });
+  },
+
   navigate: function (tabId) {
     var self = this;
     self.state.currentTab = tabId;
 
-    // 更新导航高亮
     var items = document.querySelectorAll('#nav-list li');
     items.forEach(function (li, i) {
       li.classList.toggle('active', self.NAV_ITEMS[i] && self.NAV_ITEMS[i].id === tabId);
@@ -143,20 +109,17 @@ var App = {
     var content = document.getElementById('content');
     content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
-    // 若模块已加载，直接使用缓存引用，无需重新创建 script 标签
     if (self.moduleRefs[tabId]) {
-      self.moduleRefs[tabId].render(self.cloudbase, self.state);
+      self.moduleRefs[tabId].render(self.state);
       return;
     }
 
-    // 动态加载模块脚本
     var script = document.createElement('script');
     script.src = 'js/' + navItem.module;
     script.onload = function () {
-      // 立即保存模块引用，防止后续模块加载覆盖全局 Module 变量
       self.moduleRefs[tabId] = Module;
       if (Module && typeof Module.render === 'function') {
-        Module.render(self.cloudbase, self.state);
+        Module.render(self.state);
       }
     };
     script.onerror = function () {
@@ -166,11 +129,8 @@ var App = {
   }
 };
 
-// 启动应用（兼容 DOM 已就绪的情况）
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function () {
-    App.init();
-  });
+  document.addEventListener('DOMContentLoaded', function () { App.init(); });
 } else {
   App.init();
 }
