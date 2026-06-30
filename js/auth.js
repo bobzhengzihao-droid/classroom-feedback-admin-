@@ -7,7 +7,13 @@ var Auth = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }).then(function (r) { return r.json(); });
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (json) {
+      if (json.error) throw new Error(json.error);
+      return json;
+    });
   },
 
   login: function (password) {
